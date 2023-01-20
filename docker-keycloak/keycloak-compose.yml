@@ -1,0 +1,85 @@
+version: '3.5'
+services:
+  
+  keycloak: # https://www.keycloak.org/server/containers
+    image: quay.io/keycloak/keycloak:latest
+#   The production mode is targeted for deployments of Keycloak into production environments and follows a "secure by default" principle.
+#   Without further configuration, this command will not start Keycloak and show you an error instead. 
+#   This is done on purpose, because Keycloak follows a "secure by default" principle in this mode and expects to have a hostname setup and a HTTPS/TLS setup available when started in production mode.
+#   The production mode sets the following defaults:
+#       - HTTP is disabled as transport layer security (HTTPS) is essential
+#       - Hostname configuration is expected
+#       - HTTPS/TLS configuration is expected
+#    command: [
+#        'start',
+#        '--hostname=keycloak',
+#        '--https-certificate-file=/home/crt/certificate.pem',
+#        '--https-certificate-key-file=/home/crt/key.pem'
+#        '--import-realm'
+#    ]
+    
+#   The development mode is targeted for people trying out Keycloak the first time and get it up and running quickly. 
+#   It also offers convenient defaults for developers, for example to develop a new Keycloak theme.
+#   The development mode sets the following default configuration:
+#      - HTTP is enabled
+#      - Strict hostname resolution is disabled
+#      - Cache is set to local (No distributed cache mechanism used for high availability)
+#      - Theme- and Template-caching is disabled
+    command: [
+      'start-dev',
+      '--import-realm'
+    ]
+    volumes:
+#     self-signed certificate
+      - ./crt/certificate.pem:/home/crt/certificate.pem
+      - ./crt/key.pem:/home/crt/key.pem
+#     configuration file
+      - ./conf/keycloak.conf:/opt/keycloak/conf/keycloak.conf # https://www.keycloak.org/server/all-config
+#     realm to import on startup
+      - ./realm-config/demo-realm.json:/opt/keycloak/data/import/demo-realm.json #https://www.keycloak.org/server/containers#_importing_a_realm_on_startup
+#     custom themes
+      - ./themes:/opt/keycloak/themes/
+    environment:
+#     please, for the ancients gods sake, remember to comment after the first docker-compose up
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KC_DB=mysql
+      - KC_DB_URL_HOST=mysqlk
+      - KC_DB_URL_PORT=3306
+      - KC_DB_URL_DATABASE=keycloak
+    depends_on:
+      - mysqlk
+    ports:
+      - 8888:8080 #http
+#      - 8443:8443 #https
+  
+  
+  mysqlk:
+    container_name: mysqlk
+    image: mysql/mysql-server:latest
+    environment:
+      - MYSQL_ROOT_PASSWORD=keycloak
+      - MYSQL_ROOT_HOST="%"
+      - MYSQL_DATABASE=keycloak
+      - MYSQL_USER=keycloak
+      - MYSQL_PASSWORD=keycloak
+  
+  
+  ldap:
+    image: osixia/openldap:latest
+    environment:
+      - LDAP_ADMIN_PASSWORD=test
+      - LDAP_BASE_DN=dc=example,dc=org
+    ports:
+      - 389:389
+
+  
+  ldap_server_admin:
+    image: osixia/phpldapadmin:latest
+    depends_on:
+      - ldap
+    ports:
+      - 8090:80
+    environment:
+      - PHPLDAPADMIN_LDAP_HOSTS=ldap
+      - PHPLDAPADMIN_HTTPS='false'
